@@ -1,0 +1,8 @@
+{
+  "name": "fixture-market",
+  "owner": { "name": "Fixture Owner" },
+  "plugins": [
+    { "name": "tools", "source": "./plugins/tools", "description": "Hand-written description", "category": "dev" },
+    { "name": "extra", "source": "./elsewhere" }
+  ]
+}

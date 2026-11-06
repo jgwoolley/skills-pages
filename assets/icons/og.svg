@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <radialGradient id="a" cx=".15" cy="0" r=".9"><stop offset="0" stop-color="#dcd7ff"/><stop offset="1" stop-color="#dcd7ff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="b" cx="1" cy=".1" r=".7"><stop offset="0" stop-color="#cdeef0"/><stop offset="1" stop-color="#cdeef0" stop-opacity="0"/></radialGradient>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6d5ff0"/><stop offset="1" stop-color="#4338ca"/></linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#f6f7f9"/>
+  <rect width="1200" height="630" fill="url(#a)"/>
+  <rect width="1200" height="630" fill="url(#b)"/>
+  <g transform="translate(96 96) scale(.3125)">
+    <rect width="512" height="512" rx="112" fill="url(#g)"/>
+    <path fill="#fff" d="M232 96c10 66 46 102 112 112-66 10-102 46-112 112-10-66-46-102-112-112 66-10 102-46 112-112z"/>
+    <path fill="#fff" fill-opacity=".85" d="M360 272c6 38 26 58 64 64-38 6-58 26-64 64-6-38-26-58-64-64 38-6 58-26 64-64z"/>
+    <rect x="120" y="360" width="160" height="28" rx="14" fill="#fff" fill-opacity=".55"/>
+  </g>
+  <g font-family="Inter, 'Segoe UI', 'DejaVu Sans', system-ui, sans-serif" fill="#111827">
+    <text x="96" y="370" font-size="92" font-weight="800" letter-spacing="-2">Agent skills</text>
+    <text x="98" y="440" font-size="34" fill="#4b5563">Browse, test and install skills for Claude Code,</text>
+    <text x="98" y="486" font-size="34" fill="#4b5563">OpenCode, pi, oh-my-pi and more.</text>
+  </g>
+  <rect x="96" y="540" width="1008" height="2" fill="#e5e7eb"/>
+  <text x="96" y="580" font-family="'DejaVu Sans Mono', ui-monospace, monospace" font-size="24" fill="#5b4fe0">npx skills add · claude plugin install · pi install</text>
+</svg>

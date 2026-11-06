@@ -1,0 +1,10 @@
+{
+  "name": "grouped",
+  "owner": { "name": "Fixture" },
+  "metadata": { "description": "Grouped skills" },
+  "plugins": [
+    { "name": "document-skills", "description": "Office documents", "source": "./", "strict": false, "skills": ["./skills/docx", "./skills/pdf"], "category": "productivity" },
+    { "name": "solo", "description": "Solo plugin", "source": "./", "strict": false, "skills": ["./skills/solo"] },
+    { "name": "elsewhere", "description": "From another repo", "source": { "source": "github", "repo": "acme/other" } }
+  ]
+}

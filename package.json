@@ -1,0 +1,51 @@
+{
+  "name": "@nf3t/skills-pages",
+  "version": "1.0.0",
+  "description": "Publish an agent skills repo as a static site with install guides and marketplaces for Claude Code, oh-my-pi, OpenCode, pi and the skills CLI.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "skills-pages": "dist/src/cli.js"
+  },
+  "files": [
+    "dist/src",
+    "assets",
+    "docs"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "prepare": "tsc -p .",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc -p . --noEmit",
+    "start": "node dist/src/cli.js",
+    "pretest": "tsc -p .",
+    "installed": "npm run build && node dist/src/cli.js build --installed --yes",
+    "installed:serve": "npm run build && node dist/src/cli.js serve --installed --yes"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.8.1",
+    "markdown-it": "^15.0.3",
+    "picocolors": "^1.1.1",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  },
+  "keywords": [
+    "agent-skills",
+    "skills",
+    "claude-code",
+    "opencode",
+    "pi",
+    "oh-my-pi",
+    "marketplace",
+    "static-site"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
