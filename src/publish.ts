@@ -335,7 +335,7 @@ function layout(src: SourceInfo, o: LayoutOptions): string {
   // Data block: not executed, so the strict CSP still holds. `<` is escaped so it can't close the tag.
   const payload = JSON.stringify({ ...o.data, page: o.page }).replace(/</g, "\\u003c");
   // Site navigation stays in the same tab (every other link opens a new one).
-  const navLink = (href: string, label: string, on: boolean, cls = "") => `<a href="${href}"${cls ? ` class="${cls}"` : ""}${on ? ' aria-current="page"' : ""}>${label}</a>`;
+  const navLink = (href: string, label: string, on: boolean, cls = "", title = "") => `<a href="${href}"${cls ? ` class="${cls}"` : ""}${title ? ` title="${esc(title)}"` : ""}${on ? ' aria-current="page"' : ""}>${label}</a>`;
   const menuOn = o.page.kind === "docs" || o.page.kind === "tester" || o.page.kind === "build";
   const nav = `<nav class="topnav" aria-label="Site">
   <div class="wrap">
@@ -346,7 +346,7 @@ function layout(src: SourceInfo, o: LayoutOptions): string {
     <details class="nav-menu">
       <summary aria-label="More pages"${menuOn ? ' class="on"' : ""}><span class="burger" aria-hidden="true"></span></summary>
       <div class="nav-menu-list">
-        ${navLink(`${r}docs/skills-pages/`, "skills-pages", o.page.kind === "docs")}
+        ${navLink(`${r}docs/skills-pages/`, "skills-pages", o.page.kind === "docs", "", "About skills-pages, the tool that generated this site")}
         ${navLink(`${r}tester/`, "Tester", o.page.kind === "tester")}
         ${navLink(`${r}build/`, "Source", o.page.kind === "build")}
       </div>

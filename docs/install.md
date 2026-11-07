@@ -35,6 +35,11 @@ npm install --save-dev @nf3t/skills-pages
 npx skills-pages build
 ```
 
+### The bundled skills (pi, npm)
+
+The package also ships two skills, `skills-pages-cli` and `skills-pages-ci`, that teach an agent to use the CLI and to
+publish from CI. pi can install them from npm: `pi install npm:@nf3t/skills-pages`.
+
 ## First run
 
 ```console

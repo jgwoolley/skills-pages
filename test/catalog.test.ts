@@ -431,6 +431,13 @@ describe("install methods", () => {
     assert.deepEqual(ids(d, "opencode", { ...o, plugin: "far" }), []);
     assert.deepEqual(ids(d, "claude", { ...o, plugin: "far" }), ["site-marketplace"]);
   });
+  it("T3 Code is listed but unsupported: one blocked tab, no commands", () => {
+    const list = methods(data({ git: gitAll }), "t3code", { protocol: "https", scope: "global" });
+    assert.equal(list.length, 1);
+    assert.equal(list[0]!.blocked?.kind, "instead");
+    assert.deepEqual(list[0]!.phases, []);
+    assert.equal(defaultMethod(list), list[0]);
+  });
   it("install steps name their destination folder (copyable)", () => {
     const title = (agent: string, id: string, o: Opts, d = data({ git: gitAll })) =>
       method(d, agent, id, o).phases.find((p) => p.kind === "install")!.steps[0]!.title;
@@ -529,7 +536,7 @@ describe("publish", () => {
       assert.match(docs, /<a href="#behind-a-corporate-network">/, "table of contents links the sections");
       assert.match(docs, /<h3 id="preferences-global-defaults-xdg">/, "sub-sections have anchors too");
       assert.doesNotMatch(docs, /<script>|<h1>Installing skills-pages<\/h1>/, "no raw HTML; the page has its own title");
-      assert.match(html, /<a href="docs\/skills-pages\/">skills-pages<\/a>/);
+      assert.match(html, /<a href="docs\/skills-pages\/"[^>]*>skills-pages<\/a>/);
       assert.match(buildPage, /href="\.\.\/docs\/skills-pages\/">How to install skills-pages/);
       assert.doesNotMatch(html, /<script>/, "no inline executable scripts");
       // One static page per skill, carrying only that skill's data and root-relative assets.

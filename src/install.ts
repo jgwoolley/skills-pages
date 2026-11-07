@@ -464,6 +464,7 @@ function piNpmMethod(d: InstallData, o: GuideOptions): Method | undefined {
 }
 
 function skillsCliMethod(d: InstallData, a: AgentDef, o: GuideOptions): Method {
+  if (a.unsupported || !a.skillsCli) throw new Error(`${a.label} has no skills CLI agent id`);
   // Source: the repo when the skills CLI can find every skill in it; otherwise this site, whose
   // .well-known/agent-skills/index.json lists every skill (it only finds plugins/*/skills/* through the repo's marketplace).
   const viaSite = !d.repo || (d.mixedLayout && !d.git.claude);

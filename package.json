@@ -25,6 +25,7 @@
     "typecheck": "tsc -p . --noEmit",
     "start": "node dist/src/cli.js",
     "pretest": "tsc -p .",
+    "prepublishOnly": "npm test && node dist/src/cli.js check . --strict && node dist/src/cli.js repo-files . --yes && git diff --exit-code -- .claude-plugin .omp-plugin",
     "installed": "npm run build && node dist/src/cli.js build --installed --yes",
     "installed:serve": "npm run build && node dist/src/cli.js serve --installed --yes"
   },
