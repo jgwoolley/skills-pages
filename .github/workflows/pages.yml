@@ -1,0 +1,42 @@
+# Builds this repo's own skills site with its own CLI (from source) and deploys it to GitHub Pages.
+# Enable Pages with "Source: GitHub Actions" in the repository settings.
+name: pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      DO_NOT_TRACK: "1"
+      NPM_CONFIG_UPDATE_NOTIFIER: "false"
+      NPM_CONFIG_AUDIT: "false"
+      NPM_CONFIG_FUND: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: node dist/src/cli.js check . --strict
+      - id: pages
+        uses: actions/configure-pages@v5
+      - run: node dist/src/cli.js build . --no-interactive --out public --base-url "${{ steps.pages.outputs.base_url }}/"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - id: deployment
+        uses: actions/deploy-pages@v4

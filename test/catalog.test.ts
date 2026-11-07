@@ -524,13 +524,13 @@ describe("publish", () => {
       assert.match(html, /<a href="tester\/">Tester<\/a>/);
       await readFile(path.join(out, "assets", "vendor", "yaml", "index.js"));
       // skills-pages' install guide is rendered into every site, linked from the navbar and the build page.
-      const docs = await readFile(path.join(out, "docs", "install", "index.html"), "utf8");
+      const docs = await readFile(path.join(out, "docs", "skills-pages", "index.html"), "utf8");
       assert.match(docs, /<h2 id="requirements">Requirements<\/h2>/);
       assert.match(docs, /<a href="#behind-a-corporate-network">/, "table of contents links the sections");
       assert.match(docs, /<h3 id="preferences-global-defaults-xdg">/, "sub-sections have anchors too");
       assert.doesNotMatch(docs, /<script>|<h1>Installing skills-pages<\/h1>/, "no raw HTML; the page has its own title");
-      assert.match(html, /<a href="docs\/install\/">Docs<\/a>/);
-      assert.match(buildPage, /href="\.\.\/docs\/install\/">How to install skills-pages/);
+      assert.match(html, /<a href="docs\/skills-pages\/">skills-pages<\/a>/);
+      assert.match(buildPage, /href="\.\.\/docs\/skills-pages\/">How to install skills-pages/);
       assert.doesNotMatch(html, /<script>/, "no inline executable scripts");
       // One static page per skill, carrying only that skill's data and root-relative assets.
       const page = await readFile(path.join(out, "skill", "beta", "index.html"), "utf8");

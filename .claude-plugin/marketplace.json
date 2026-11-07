@@ -1,0 +1,40 @@
+{
+  "name": "skills-pages",
+  "owner": {
+    "name": "jgwoolley",
+    "url": "https://github.com/jgwoolley"
+  },
+  "metadata": {
+    "description": "Agent skills from https://github.com/jgwoolley/skills-pages"
+  },
+  "plugins": [
+    {
+      "name": "skills-pages",
+      "source": "./",
+      "description": "All skills in skills-pages",
+      "strict": false,
+      "skills": [
+        "./skills/skills-pages-ci",
+        "./skills/skills-pages-cli"
+      ]
+    },
+    {
+      "name": "skills-pages-ci",
+      "description": "Integrate skills-pages into a CI/CD pipeline so a skills repository is validated and its site and Claude Code marketplace are deployed to GitHub Pages or GitLab Pages on every push. Use when asked to automate publishing of a skills repo, add a pages workflow, or gate a deploy on skill checks.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/skills-pages-ci"
+      ]
+    },
+    {
+      "name": "skills-pages-cli",
+      "description": "Use the skills-pages CLI (@nf3t/skills-pages) to turn an agent skills repository into a static site with install guides and Claude Code, oh-my-pi, OpenCode and pi marketplaces. Use when asked to publish, preview, build, validate or check a skills repo, or to write its marketplace.json files.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/skills-pages-cli"
+      ]
+    }
+  ]
+}

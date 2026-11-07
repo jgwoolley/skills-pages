@@ -311,9 +311,9 @@ function set<K extends keyof Settings>(key: K, value: Settings[K]) {
 
 function setupControls() {
   const agent = document.getElementById("agent") as HTMLSelectElement;
-  const group = (label: string, native: boolean) =>
-    el("optgroup", { label }, ...AGENTS.filter((a) => a.native === native).map((a) => el("option", { value: a.id, textContent: a.label })));
-  agent.replaceChildren(group("Native", true), group("Via skills CLI", false));
+  const group = (label: string, pick: (a: (typeof AGENTS)[number]) => boolean) =>
+    el("optgroup", { label }, ...AGENTS.filter(pick).map((a) => el("option", { value: a.id, textContent: a.label })));
+  agent.replaceChildren(group("Native", (a) => a.native), group("Via skills CLI", (a) => !a.native && !a.unsupported), group("Not supported", (a) => !!a.unsupported));
   agent.addEventListener("change", () => set("agent", agent.value));
 
   // Segmented toggles (protocol, scope) and the method tabs: click + arrow keys.

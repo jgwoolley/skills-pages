@@ -12,7 +12,7 @@ describe("seo", () => {
   it("builds canonical page URLs below the site path", () => {
     assert.equal(pagePath({ kind: "catalog", root: "" }), "");
     assert.equal(pagePath({ kind: "skill", skill: "alpha", root: "../../" }), "skill/alpha/");
-    assert.equal(pagePath({ kind: "docs", root: "../../" }), "docs/install/");
+    assert.equal(pagePath({ kind: "docs", root: "../../" }), "docs/skills-pages/");
     assert.equal(absUrl("https://acme.github.io/skills/", "plugins/"), "https://acme.github.io/skills/plugins/");
     assert.equal(absUrl(undefined, "plugins/"), "plugins/");
   });

@@ -12,6 +12,22 @@ npx @nf3t/skills-pages serve ~/skills       # build and preview
 **Installing:** see [docs/install.md](docs/install.md). It covers npm/pnpm/bun, internal registries, global preferences,
 and an RPM example for corporate networks.
 
+## Use it from an agent (this repo's own marketplace)
+
+This repo publishes itself with its own CLI at <https://jgwoolley.github.io/skills-pages/> (`.github/workflows/pages.yml`).
+It ships two skills that teach an agent to use the CLI and wire it into CI/CD:
+
+- `skills-pages-cli`: build, serve, check and write marketplaces.
+- `skills-pages-ci`: GitHub Pages / GitLab Pages pipelines with a `check --strict` gate.
+
+```console
+claude plugin marketplace add jgwoolley/skills-pages
+claude plugin install skills-pages@skills-pages
+```
+
+Other agents: `npx skills add jgwoolley/skills-pages`. After changing a skill, refresh the committed marketplaces with
+`node dist/src/cli.js repo-files . --yes`. Enable Pages once under Settings > Pages > Source: **GitHub Actions**.
+
 ## Commands
 
 | Command | What it does |
@@ -62,7 +78,7 @@ marketplace name, the owner and plugin descriptions.
 | `plugins/<name>/index.html` | One page per plugin: details, install guides for just that plugin (marketplace `<plugin>@<marketplace>`, OpenCode with its skills' indexes, skills CLI with `--skill a b c`), context estimate and its skills |
 | `build/index.html` | **Source** (in the navbar's ☰ menu, and the footer's "Built … ago"): build date, the commit linked on GitHub/GitLab with its date and branch, a ⚠ flag when the working tree had uncommitted changes, and the CI/CD run (GitHub Actions run / GitLab job and pipeline, from their environment variables) |
 | `tester/index.html` | **Tester**: paste the URL of a SKILL.md, skill zip, skills index, Claude Code / oh-my-pi marketplace or catalog site, or pick a file. The browser reads it like an agent would and reports problems: spec rules, invalid YAML, descriptions over 1024 characters, reserved names, archive URLs, sha256 digests and zip contents. Git repositories can't be read from a browser. This is the only page allowed to fetch other hosts, only when you press Validate, and the host must allow CORS |
-| `docs/install/index.html` | **Docs**: skills-pages' install guide (`docs/install.md`, shipped with the CLI), with section anchors and a table of contents. Linked from the navbar and the Source page |
+| `docs/skills-pages/index.html` | **Docs**: skills-pages' install guide (`docs/install.md`, shipped with the CLI), with section anchors and a table of contents. Linked from the navbar and the Source page |
 | `skill/<name>/index.html` | One page per skill: description, install guides for just that skill, a formatted `SKILL.md` preview, then its files (a paginated table with size and ≈ tokens per file; `?page=&size=` in the URL). The preview is rendered at build time without the frontmatter; raw HTML in the file is escaped, relative links point to the published files, and remote images become links |
 | `.claude-plugin/marketplace.json`, `.omp-plugin/marketplace.json` | The published folder as a marketplace, with relative sources to the skill copies. Useful when the site is deployed from a git branch or cloned. The guides never offer a path on the build machine |
 | `.well-known/agent-skills/index.json` + `*.zip` | Agent-skills discovery index (v0.2.0) for the skills CLI: `npx skills add <site>` finds it. One zip per skill with `SKILL.md` at its root, plus a sha256 digest |
@@ -164,6 +180,7 @@ installs into, as a click-to-copy chip. The folders below were verified on disk 
 | OpenCode | **Remote index** (`skills.urls` in `opencode.json`; updates itself via each skill's `version`) · skills CLI |
 | pi | **pi package** (`pi install`, `pi update`; whole catalog, root `skills/` layout) · skills CLI |
 | Codex, Cursor, GitHub Copilot, Gemini CLI, Cline, Roo Code, Goose, Amp | skills CLI |
+| T3 Code | Not supported: it has no skills install of its own. The tab says to install for the agent it runs (Claude Code, Codex) and start a new thread |
 
 When the site URL is known but the site was built locally, not by CI, the site-based commands are still shown, with a
 heads-up that they work once the site is deployed there. A repository with an origin but no commits gets a "commit and push

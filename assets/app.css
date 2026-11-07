@@ -107,11 +107,14 @@ details > .report-head { cursor: pointer; }
 .badge-ok { background: var(--ok); } .badge-warn { background: #d99a00; } .badge-fail { background: #d9534f; } .badge-info { background: #8a93a6; }
 
 .hero {
-  padding: 56px 0 40px;
+  padding: 56px 0 0;
   background:
     radial-gradient(900px 300px at 10% -10%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
     radial-gradient(700px 260px at 95% 0%, color-mix(in srgb, #20b2aa 16%, transparent), transparent 70%);
-  border-bottom: 1px solid var(--line);
+  /* Fade into the page instead of ending in a hard line above the rounded cards. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
+  mask-image: linear-gradient(to bottom, #000 55%, transparent);
+  padding-bottom: 56px;
 }
 .eyebrow { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 .hero h1 { margin: 6px 0 8px; font-size: clamp(30px, 5vw, 44px); line-height: 1.1; letter-spacing: -.02em; }

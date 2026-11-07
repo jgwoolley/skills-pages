@@ -1,6 +1,6 @@
 {
   "name": "@nf3t/skills-pages",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Publish an agent skills repo as a static site with install guides and marketplaces for Claude Code, oh-my-pi, OpenCode, pi and the skills CLI.",
   "type": "module",
   "license": "MIT",
@@ -10,7 +10,10 @@
   "files": [
     "dist/src",
     "assets",
-    "docs"
+    "docs",
+    "skills",
+    ".claude-plugin",
+    ".omp-plugin"
   ],
   "engines": {
     "node": ">=22.18"
@@ -43,9 +46,19 @@
     "pi",
     "oh-my-pi",
     "marketplace",
-    "static-site"
+    "static-site",
+    "pi-package"
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jgwoolley/skills-pages.git"
+  },
+  "pi": {
+    "skills": [
+      "./skills"
+    ]
   }
 }

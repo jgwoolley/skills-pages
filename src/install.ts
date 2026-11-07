@@ -15,6 +15,8 @@ export interface AgentDef {
   dirs: { project: string; global: string };
   /** Supported natively by this catalog (marketplaces, index, packages); otherwise via the skills CLI only. */
   native: boolean;
+  /** Listed so people can find it, but has no install method of its own (see `methods`). */
+  unsupported?: boolean;
 }
 
 export const AGENTS: AgentDef[] = [
@@ -30,6 +32,7 @@ export const AGENTS: AgentDef[] = [
   { id: "roo", label: "Roo Code", skillsCli: "roo", dirs: { project: ".roo/skills/", global: "~/.roo/skills/" }, native: false },
   { id: "goose", label: "Goose", skillsCli: "goose", dirs: { project: ".goose/skills/", global: "~/.config/goose/skills/" }, native: false },
   { id: "amp", label: "Amp", skillsCli: "amp", dirs: { project: ".agents/skills/", global: "~/.config/agents/skills/" }, native: false },
+  { id: "t3code", label: "T3 Code", skillsCli: "", dirs: { project: "", global: "" }, native: false, unsupported: true },
 ];
 
 export type MethodId = "git-marketplace" | "site-marketplace" | "remote-index" | "pi-package" | "pi-npm" | "skills-cli";
@@ -505,6 +508,16 @@ function skillsCliMethod(d: InstallData, a: AgentDef, o: GuideOptions): Method {
  */
 export function methods(d: InstallData, agentId: string, o: GuideOptions): Method[] {
   const a = AGENTS.find((x) => x.id === agentId) ?? AGENTS[0]!;
+  if (a.unsupported)
+    return [
+      blocked(
+        "skills-cli",
+        "Not supported",
+        `${a.label} has no skills install of its own. It runs other agents (Claude Code, Codex and others) and they load the skills.`,
+        "the Claude Code or Codex tab, run on the machine that runs the T3 Code server, then start a new thread.",
+        "instead",
+      ),
+    ];
   const out: (Method | undefined)[] = [];
   if (a.id === "claude" || a.id === "omp") out.push(marketplaceMethod(d, a.id, "git", o), marketplaceMethod(d, a.id, "site", o));
   if (a.id === "opencode") out.push(remoteIndexMethod(d, o));

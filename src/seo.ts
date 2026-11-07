@@ -22,7 +22,7 @@ export function pagePath(p: PageInfo): string {
     case "tester":
       return "tester/";
     case "docs":
-      return "docs/install/";
+      return "docs/skills-pages/";
   }
 }
 
@@ -168,7 +168,7 @@ export function jsonLd(o: HeadOptions, url: string, desc: string): object {
         { "@type": "TechArticle", headline: o.title, description: desc, url, isPartOf: { "@id": `${site}#website` } },
         crumbs([
           ["Skills", ""],
-          ["Docs", pagePath(o.page)],
+          ["skills-pages", pagePath(o.page)],
         ]),
       );
       break;
