@@ -21,10 +21,10 @@
   "scripts": {
     "build": "tsc -p .",
     "prepare": "tsc -p .",
-    "test": "node --test \"test/**/*.test.ts\"",
+    "test": "node --test \"dist/test/**/*.test.js\"",
     "typecheck": "tsc -p . --noEmit",
     "start": "node dist/src/cli.js",
-    "pretest": "tsc -p .",
+    "pretest": "tsc -p . && node -e \"require('node:fs').cpSync('test/fixtures', 'dist/test/fixtures', { recursive: true })\"",
     "prepublishOnly": "npm test && node dist/src/cli.js check . --strict && node dist/src/cli.js repo-files . --yes && git diff --exit-code -- .claude-plugin .omp-plugin",
     "installed": "npm run build && node dist/src/cli.js build --installed --yes",
     "installed:serve": "npm run build && node dist/src/cli.js serve --installed --yes"

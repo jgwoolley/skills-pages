@@ -1,0 +1,36 @@
+# skills-pages: publishes the already-built site at http://skills-pages.localhost with nginx. Nothing is built here.
+#
+#   npm ci && npm run build && node dist/src/cli.js build . --no-interactive --out public --base-url http://skills-pages.localhost/
+#   docker compose up -d       # docker compose down to stop
+#
+# Joins the shared devbox Traefik (devbox_network); no host ports. The mounts are read-only and must exist already:
+# if one is missing, "up" fails instead of creating an empty root-owned directory.
+# HOST_WORKSPACE is the workspace path on the Docker host, set in devbox terminals: the host's daemon resolves bind
+# mounts, not the container. Run from a terminal on the host itself, the fallback (..) is the same directory.
+
+services:
+  web:
+    image: nginx:alpine
+    container_name: skills-pages-web
+    read_only: true
+    tmpfs: [/tmp, /run, /var/cache/nginx]
+    volumes:
+      - type: bind
+        source: ${HOST_WORKSPACE:-..}/skills-pages/public
+        target: /usr/share/nginx/html
+        read_only: true
+        bind:
+          create_host_path: false
+    networks: [proxy]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${NETWORK_NAME:-devbox_network}
+      - traefik.http.routers.skills-pages-web.rule=Host(`${SKILLS_PAGES_HOST:-skills-pages.localhost}`)
+      - traefik.http.routers.skills-pages-web.entrypoints=web
+      - traefik.http.services.skills-pages-web.loadbalancer.server.port=80
+    restart: unless-stopped
+
+networks:
+  proxy:
+    external: true
+    name: ${NETWORK_NAME:-devbox_network}
