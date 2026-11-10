@@ -62,6 +62,10 @@ export interface InstallData {
   /** Who built the site: CI is assumed to deploy it; a local build may not be deployed yet. */
   deploy?: { builtBy: "ci" | "local"; noCommits?: boolean };
   piPackage: boolean;
+  /** The repository's own icon, saved under assets/icons/ and used as the favicon (see repo-icon.ts). */
+  icon?: { path: string; mime: string; width?: number; height?: number };
+  /** `--no-index` / `--no-follow`: what the pages tell crawlers. */
+  robots?: { noindex?: boolean; nofollow?: boolean };
   /**
    * Skills in both a root skills/ folder and plugins/<plugin>/skills/. Cloning such a repo, the skills CLI stops at the
    * root skills/ unless .claude-plugin/marketplace.json lists the plugins (checked against skills v1.7). A plugins-only
@@ -182,6 +186,16 @@ const deployNotes = (d: InstallData): string[] => {
       : `Heads-up: this site was built on a local machine, not by CI. These commands work once it's deployed to \`${d.siteUrl}\`.`,
   ];
 };
+
+/**
+ * Private GitHub/GitLab Pages sit behind a login. Agents fetch marketplaces, indexes and zips anonymously and have no
+ * way to authenticate to a catalog, so site-based installs only work for a public site. Git installs use the user's
+ * own git credentials, which is why they are preferred whenever the repo is known.
+ */
+const siteAccessNote = (d: InstallData): string[] =>
+  d.repo && !/^https?:\/\/(localhost|127\.|\[::1\])/.test(d.siteUrl)
+    ? ["Needs a public site: agents can't sign in to private GitHub / GitLab Pages, so for a private repository use a git method instead."]
+    : [];
 
 const REPO_FIX = "Set the repo's `origin` remote (or pass `--repo-url`) and rebuild.";
 const MARKETPLACE_FIX = "Run `skills-pages repo-files` (or build with `--write-repo`), commit and push the marketplace files, then rebuild.";
@@ -306,7 +320,7 @@ function marketplaceMethod(d: InstallData, cli: "claude" | "omp", via: "git" | "
         notes: [
           source,
           ...previewNote,
-          ...(via === "site" ? deployNotes(d) : []),
+          ...(via === "site" ? [...deployNotes(d), ...siteAccessNote(d)] : []),
           ...(via === "git" && d.checkout && !d.checkout.hasCommits
             ? [`Heads-up: the repository has no commits yet. Commit and push \`${repoFile}\` first; this command clones what's on the remote.`]
             : []),
@@ -376,6 +390,7 @@ function remoteIndexMethod(d: InstallData, o: GuideOptions): Method {
             ? `Source: [${base}index.json](${base}index.json) on this site, downloaded over HTTPS (the HTTPS/SSH choice doesn't apply).`
             : `Source: one index per skill on this site (e.g. [${bases[0]}index.json](${bases[0]}index.json)), downloaded over HTTPS (the HTTPS/SSH choice doesn't apply).`,
           ...deployNotes(d),
+          ...siteAccessNote(d),
           `Add this to \`${file}\`, merging \`skills.urls\` into your existing config.`,
           scopeNote(o, "applies to every project.", "applies to this project; commit `opencode.json` to share."),
           ...snapshotNote(o),
@@ -490,7 +505,7 @@ function skillsCliMethod(d: InstallData, a: AgentDef, o: GuideOptions): Method {
           viaSite
             ? "Source: [.well-known/agent-skills/index.json](.well-known/agent-skills/index.json) on this site, a zip per skill with a sha256 digest (the HTTPS/SSH choice doesn't apply)."
             : `Source: ${repoLink(d)}, cloned over ${proto(o.protocol)}.`,
-          ...(viaSite ? deployNotes(d) : []),
+          ...(viaSite ? [...deployNotes(d), ...siteAccessNote(d)] : []),
           scopeNote(o, "available in every project.", "recorded in `skills-lock.json`; commit it and the skills folder to share."),
           ...snapshotNote(o),
           ...(a.id === "omp" ? ["oh-my-pi reads `~/.agents/skills` and `.agents/skills`, where the `pi` agent installs."] : []),

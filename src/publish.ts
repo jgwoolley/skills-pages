@@ -8,6 +8,7 @@ import { estimateTokens, formatBytes, formatTokens, totalSize, type FileInfo, ty
 import { renderDoc, renderSkillMarkdown, stripFrontmatter } from "./markdown.ts";
 import { buildCopyMarketplace, buildMarketplace, type CopyEntry } from "./marketplace.ts";
 import { ico, manifest, pngSize, serviceWorker } from "./pwa.ts";
+import type { RepoIcon } from "./repo-icon.ts";
 import { headTags, pagePath, robotsTxt, sitemapXml, type SocialImage } from "./seo.ts";
 import { zip, type ZipEntry } from "./zip.ts";
 import { treeUrl } from "./source.ts";
@@ -85,6 +86,12 @@ export interface PublishOptions {
   /** The CI run building this site, if any (shown on the build page). */
   ci?: { provider: "github" | "gitlab"; url: string; label: string; pipelineUrl?: string; ref?: string };
   ref?: string;
+  /** The repository's icon, used as the favicon instead of the generated one. */
+  icon?: RepoIcon;
+  /** `--no-index`: noindex on every page, Disallow in robots.txt, no sitemap. */
+  noIndex?: boolean;
+  /** `--no-follow`: nofollow on every page. */
+  noFollow?: boolean;
   /** Marketplace files present in the repo after --write-repo (or already committed). */
   git: InstallData["git"];
 }
@@ -210,6 +217,7 @@ export async function publish(cat: Catalog, src: SourceInfo, opts: PublishOption
     ...(opts.deploy ? { deploy: opts.deploy } : {}),
     ...(opts.checkout ? { checkout: opts.checkout } : {}),
     ...(opts.npm ? { npm: opts.npm } : {}),
+    ...(opts.noIndex || opts.noFollow ? { robots: { ...(opts.noIndex ? { noindex: true } : {}), ...(opts.noFollow ? { nofollow: true } : {}) } } : {}),
     piPackage: cat.piPackage,
     mixedLayout: cat.plugins.some((p) => p.root && p.skills.length) && cat.plugins.some((p) => !p.root && !p.external && p.skills.length),
     plugins: cat.plugins.map((p) => ({
@@ -237,6 +245,11 @@ export async function publish(cat: Catalog, src: SourceInfo, opts: PublishOption
   if (!existsSync(path.join(jsDir, "site-app.js"))) throw new Error("Run `npm run build` first: the site needs the compiled browser scripts in dist/src");
   // Icons and the social card; the catalog repo's own card wins. Set before rendering: every page links to it.
   await copyTree(path.join(pkg, "assets", "icons"), path.join(out, "assets", "icons"));
+  if (opts.icon) {
+    const file = `assets/icons/repo.${opts.icon.ext}`;
+    await write(path.join(out, file), opts.icon.bytes, files, out);
+    data.icon = { path: file, mime: opts.icon.mime, ...(opts.icon.width ? { width: opts.icon.width, height: opts.icon.height } : {}) };
+  }
   social = DEFAULT_SOCIAL;
   for (const f of ["og-image.png", ".github/og-image.png"]) {
     const own = path.join(src.dir, f);
@@ -285,8 +298,8 @@ const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 's
 const DEFAULT_SOCIAL: SocialImage = { path: "assets/icons/og.png", width: 1200, height: 630, alt: "Agent skills: browse, test and install skills" };
 let social: SocialImage = DEFAULT_SOCIAL;
 
-/** Search engines may index the site: it has a real, public URL (not a preview or a placeholder). */
-const indexable = (d: InstallData) => d.siteUrlKnown !== false && !LOOPBACK.test(d.siteUrl);
+/** Search engines may index the site: it has a real, public URL (not a preview or a placeholder) and `--no-index` is off. */
+const indexable = (d: InstallData) => d.siteUrlKnown !== false && !LOOPBACK.test(d.siteUrl) && !d.robots?.noindex;
 
 /** One timestamp for every page of a build (and the build page). */
 const BUILT_AT = new Date().toISOString().replace(/\.\d+Z$/, "Z");
@@ -339,7 +352,7 @@ function layout(src: SourceInfo, o: LayoutOptions): string {
   const menuOn = o.page.kind === "docs" || o.page.kind === "tester" || o.page.kind === "build";
   const nav = `<nav class="topnav" aria-label="Site">
   <div class="wrap">
-    <a class="brand" href="${r || "./"}"><img class="brand-icon" src="${r}assets/icons/icon.svg" alt="" width="26" height="26"><span class="brand-name">${esc(o.siteTitle)}</span></a>
+    <a class="brand" href="${r || "./"}"><img class="brand-icon" src="${r}${o.data.icon?.path ?? "assets/icons/icon.svg"}" alt="" width="26" height="26"><span class="brand-name">${esc(o.siteTitle)}</span></a>
     ${navLink(r || "./", "Skills", o.page.kind === "catalog" || o.page.kind === "skill")}
     ${navLink(`${r}plugins/`, "Plugins", o.page.kind === "plugins" || o.page.kind === "plugin")}
     <span class="spacer"></span>
@@ -361,7 +374,7 @@ function layout(src: SourceInfo, o: LayoutOptions): string {
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <meta name="referrer" content="no-referrer">
 <title>${esc(o.title)}</title>
-${headTags({ title: o.title, description: o.description, siteTitle: o.siteTitle, page: o.page, data: o.data, indexable: indexable(o.data), image: social, modified: src.commitDate })}
+${headTags({ title: o.title, description: o.description, siteTitle: o.siteTitle, page: o.page, data: o.data, indexable: indexable(o.data), follow: !o.data.robots?.nofollow, image: social, modified: src.commitDate })}
 <link rel="stylesheet" href="${r}assets/app.css">
 <script type="module" src="${r}assets/app.js"></script>
 ${(o.scripts ?? []).map((x) => `<script type="module" src="${r}${x}"></script>`).join("\n")}
@@ -783,12 +796,14 @@ export function renderDocsPage(cat: Catalog, src: SourceInfo, data: InstallData,
 async function writeAppFiles(cat: Catalog, src: SourceInfo, data: InstallData, out: string, files: string[]): Promise<void> {
   const pkg = packageRoot();
   const description = cat.description ?? `Agent skills from ${cat.title}`;
-  await write(path.join(out, "manifest.webmanifest"), manifest({ title: cat.title, description }), files, out);
-  await write(path.join(out, "favicon.ico"), ico(new Uint8Array(await readFile(path.join(pkg, "assets", "icons", "icon-32.png")))), files, out);
+  await write(path.join(out, "manifest.webmanifest"), manifest({ title: cat.title, description, icon: data.icon }), files, out);
+  // favicon.ico holds one PNG (at most 256 px); the repository's icon only qualifies when it is one.
+  const own = data.icon && data.icon.mime === "image/png" && data.icon.width && data.icon.width <= 256 && data.icon.height && data.icon.height <= 256 ? new Uint8Array(await readFile(path.join(out, data.icon.path))) : undefined;
+  await write(path.join(out, "favicon.ico"), ico(own ?? new Uint8Array(await readFile(path.join(pkg, "assets", "icons", "icon-32.png")))), files, out);
 
   // Offline: the app shell up front; skill and plugin pages are cached as they're visited.
   const pages = ["./", "plugins/", "tester/", "build/", ...(existsSync(path.join(out, "docs", "skills-pages", "index.html")) ? ["docs/skills-pages/"] : [])];
-  const assets = ["app.css", "app.js", "install.js", "tester.js", "checks.js", "marketplace.js", "icons/icon.svg", "icons/icon-192.png", "icons/icon-32.png"].map((a) => `assets/${a}`);
+  const assets = ["app.css", "app.js", "install.js", "tester.js", "checks.js", "marketplace.js", "icons/icon.svg", "icons/icon-192.png", "icons/icon-32.png", ...(data.icon ? [data.icon.path.replace(/^assets\//, "")] : [])].map((a) => `assets/${a}`);
   await write(path.join(out, "sw.js"), serviceWorker(`${src.sha?.slice(0, 12) ?? "local"}-${BUILT_AT}`, [...pages, ...assets, "manifest.webmanifest"]), files, out);
 
   // Search: content pages only (the build and tester pages are noindex).
@@ -799,6 +814,6 @@ async function writeAppFiles(cat: Catalog, src: SourceInfo, data: InstallData, o
     ...cat.skills.map((s) => ({ kind: "skill", skill: s.name, root: "" })),
     ...(pages.includes("docs/skills-pages/") ? [{ kind: "docs", root: "" }] : []),
   ] as PageInfo[];
-  await write(path.join(out, "robots.txt"), robotsTxt(data.siteUrl, indexable(data)), files, out);
+  await write(path.join(out, "robots.txt"), robotsTxt(data.siteUrl, indexable(data), data.robots?.noindex ? "Built with --no-index" : undefined), files, out);
   if (indexable(data)) await write(path.join(out, "sitemap.xml"), sitemapXml(data.siteUrl, content.map(pagePath), src.commitDate), files, out);
 }

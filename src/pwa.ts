@@ -7,6 +7,8 @@
 export interface ManifestOptions {
   title: string;
   description: string;
+  /** The repository's own icon; only a PNG with known dimensions can be listed (manifests need `sizes`). */
+  icon?: { path: string; mime: string; width?: number; height?: number };
 }
 
 /** A short name for home screens (~12 characters fit under an icon). */
@@ -30,6 +32,7 @@ export function manifest(o: ManifestOptions): string {
     theme_color: "#ffffff",
     categories: ["developer", "productivity", "utilities"],
     icons: [
+      ...(o.icon?.mime === "image/png" && o.icon.width && o.icon.height ? [{ src: o.icon.path, sizes: `${o.icon.width}x${o.icon.height}`, type: "image/png", purpose: "any" }] : []),
       { src: "assets/icons/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
       { src: "assets/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "assets/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },

@@ -31,6 +31,11 @@ describe("CI detection", () => {
       title: "Team Skills",
     });
   });
+  it("reads the GitLab project description", () => {
+    assert.equal(ciInfo({ ...gitlab, CI_PROJECT_DESCRIPTION: " Our skills " })!.description, "Our skills");
+    assert.equal(ciInfo(gitlab)!.description, undefined);
+    assert.equal(ciInfo(github)!.description, undefined);
+  });
   it("derives the github.com Pages URL from GITHUB_REPOSITORY", () => {
     const ci = ciInfo(github)!;
     assert.equal(ci.repoUrl, "https://github.com/Acme/skills");

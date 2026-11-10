@@ -57,8 +57,10 @@ export interface HeadOptions {
   siteTitle: string;
   page: PageInfo;
   data: InstallData;
-  /** False for previews (loopback or unknown site URL): every page gets noindex. */
+  /** False for previews (loopback or unknown site URL) or `--no-index`: every page gets noindex. */
   indexable: boolean;
+  /** False for `--no-follow`: every page asks crawlers not to follow its links. */
+  follow?: boolean;
   image: SocialImage;
   /** When the content last changed (the catalog's commit date), if known. */
   modified?: string;
@@ -78,7 +80,7 @@ export function headTags(o: HeadOptions): string {
   return [
     `<meta name="description" content="${esc(desc)}">`,
     `<link rel="canonical" href="${esc(url)}">`,
-    noindex ? `<meta name="robots" content="noindex, follow">` : `<meta name="robots" content="index, follow, max-image-preview:large">`,
+    `<meta name="robots" content="${[noindex ? "noindex" : "index", o.follow === false ? "nofollow" : "follow", ...(noindex ? [] : ["max-image-preview:large"])].join(", ")}">`,
     `<meta name="generator" content="skills-pages">`,
     // Open Graph (Facebook, LinkedIn, Slack, Discord, Mastodon, …)
     `<meta property="og:type" content="website">`,
@@ -99,9 +101,7 @@ export function headTags(o: HeadOptions): string {
     `<meta name="twitter:image" content="${esc(img)}">`,
     `<meta name="twitter:image:alt" content="${esc(o.image.alt)}">`,
     // Icons, installable app
-    `<link rel="icon" href="${r}assets/icons/icon.svg" type="image/svg+xml">`,
-    `<link rel="icon" href="${r}assets/icons/icon-32.png" type="image/png" sizes="32x32">`,
-    `<link rel="apple-touch-icon" href="${r}assets/icons/apple-touch-icon.png">`,
+    ...iconLinks(r, o.data.icon),
     `<link rel="manifest" href="${r}manifest.webmanifest">`,
     `<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">`,
     `<meta name="theme-color" content="#151821" media="(prefers-color-scheme: dark)">`,
@@ -111,6 +111,24 @@ export function headTags(o: HeadOptions): string {
     `<meta name="mobile-web-app-capable" content="yes">`,
     `<script type="application/ld+json">${ld}</script>`,
   ].join("\n");
+}
+
+/**
+ * Favicon links. The repository's own icon (see repo-icon.ts) replaces the generated one, including the
+ * apple-touch-icon (browsers accept any raster format for both).
+ */
+export function iconLinks(root: string, icon: InstallData["icon"]): string[] {
+  if (!icon) {
+    return [
+      `<link rel="icon" href="${root}assets/icons/icon.svg" type="image/svg+xml">`,
+      `<link rel="icon" href="${root}assets/icons/icon-32.png" type="image/png" sizes="32x32">`,
+      `<link rel="apple-touch-icon" href="${root}assets/icons/apple-touch-icon.png">`,
+    ];
+  }
+  return [
+    `<link rel="icon" href="${esc(root + icon.path)}" type="${esc(icon.mime)}"${icon.width ? ` sizes="${icon.width}x${icon.height}"` : ""}>`,
+    `<link rel="apple-touch-icon" href="${esc(root + icon.path)}">`,
+  ];
 }
 
 /** schema.org structured data: the site, the skill list, each skill as source code, breadcrumbs. */
@@ -182,8 +200,8 @@ export function jsonLd(o: HeadOptions, url: string, desc: string): object {
  * robots.txt. Crawlers only read it at the origin root, so it takes effect on a custom domain or a user/org Pages
  * site, not under a project path; the per-page robots meta covers that case.
  */
-export function robotsTxt(siteUrl: string, indexable: boolean): string {
-  if (!indexable) return "# Preview build (no public site URL): keep it out of search engines.\nUser-agent: *\nDisallow: /\n";
+export function robotsTxt(siteUrl: string, indexable: boolean, why = "Preview build (no public site URL)"): string {
+  if (!indexable) return `# ${why}: keep it out of search engines.\nUser-agent: *\nDisallow: /\n`;
   return `User-agent: *\nAllow: /\n\nSitemap: ${absUrl(siteUrl, "sitemap.xml")}\n`;
 }
 

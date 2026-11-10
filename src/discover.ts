@@ -64,13 +64,41 @@ async function listFiles(dir: string, warnings: string[], rel = ""): Promise<str
   return out;
 }
 
-async function skillDirs(root: string, rel: string): Promise<string[]> {
+/** Why a folder without SKILL.md isn't a skill, with the likely fix. */
+async function whyNotSkill(root: string, dir: string): Promise<string> {
+  const abs = path.join(root, dir);
+  const children = await readdir(abs, { withFileTypes: true }).catch(() => []);
+  const misnamed = children.find((c) => c.isFile() && c.name !== "SKILL.md" && c.name.toLowerCase() === "skill.md");
+  if (misnamed) return `${dir}: skipped, the file is named ${misnamed.name}; rename it to SKILL.md (exactly that case)`;
+  const parent = path.posix.dirname(dir);
+  for (const c of children.sort((a, b) => a.name.localeCompare(b.name))) {
+    if (!c.isDirectory() || c.name.startsWith(".") || c.name === "node_modules") continue;
+    if (await exists(path.join(abs, c.name, "SKILL.md")))
+      return `${dir}: skipped, it has no SKILL.md, but ${dir}/${c.name}/SKILL.md exists; skills must sit directly in ${parent}/ (move ${c.name} up one level)`;
+  }
+  return `${dir}: skipped, it has no SKILL.md, so it isn't a skill`;
+}
+
+/** Skill folders directly inside `rel`. Folders that look like they should be skills but aren't get a warning saying why. */
+async function skillDirs(root: string, rel: string, warnings: string[]): Promise<string[]> {
   const abs = path.join(root, rel);
   const entries = await readdir(abs, { withFileTypes: true }).catch(() => []);
   const dirs: string[] = [];
   for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (!e.isDirectory() || e.name.startsWith(".")) continue;
-    if (await exists(path.join(abs, e.name, "SKILL.md"))) dirs.push(`${rel}/${e.name}`);
+    const dir = `${rel}/${e.name}`;
+    if (e.name === "node_modules") continue;
+    if (e.isSymbolicLink()) {
+      warnings.push(`${dir}: skipped, symlinks aren't followed; put the skill folder itself here`);
+      continue;
+    }
+    if (!e.isDirectory()) continue;
+    const skill = await exists(path.join(abs, e.name, "SKILL.md"));
+    if (e.name.startsWith(".")) {
+      if (skill) warnings.push(`${dir}: skipped, folders starting with "." are hidden from skill discovery; rename it`);
+      continue;
+    }
+    if (skill) dirs.push(dir);
+    else warnings.push(await whyNotSkill(root, dir));
   }
   return dirs;
 }
@@ -164,7 +192,7 @@ export async function discover(src: SourceInfo, opts: DiscoverOptions = {}): Pro
     return s;
   };
   /** A path that is a skill dir, or a folder of skill dirs. */
-  const skillsAt = async (dir: string): Promise<string[]> => ((await exists(path.join(root, dir, "SKILL.md"))) ? [dir] : skillDirs(root, dir));
+  const skillsAt = async (dir: string): Promise<string[]> => ((await exists(path.join(root, dir, "SKILL.md"))) ? [dir] : skillDirs(root, dir, warnings));
   type Manifest = { name?: string; description?: string; keywords?: unknown; skills?: unknown };
 
   const plugins: Plugin[] = [];
@@ -188,11 +216,14 @@ export async function discover(src: SourceInfo, opts: DiscoverOptions = {}): Pro
     const dirs = new Set<string>();
     for (const p of listed ?? []) {
       const d = within(dir, p);
-      if (d) for (const x of await skillsAt(d)) dirs.add(x);
-      else warnings.push(`Marketplace entry "${e.name}": skills path ${p} is outside the repo; ignored`);
+      if (d) {
+        const found = await skillsAt(d);
+        if (!found.length) warnings.push(`Marketplace entry "${e.name}": skills path ${p} ${(await exists(path.join(root, d))) ? "has no SKILL.md and no folders with one" : "doesn't exist"}`);
+        for (const x of found) dirs.add(x);
+      } else warnings.push(`Marketplace entry "${e.name}": skills path ${p} is outside the repo; ignored`);
     }
     // Like Claude Code: a marketplace-root entry with a skills list loads only those; otherwise <dir>/skills/ is scanned too.
-    if (!(dir === "." && listed)) for (const x of await skillDirs(root, sub(dir, "skills"))) dirs.add(x);
+    if (!(dir === "." && listed)) for (const x of await skillDirs(root, sub(dir, "skills"), warnings)) dirs.add(x);
     const tags = toTags(manifest?.keywords, e.keywords, e.tags);
     const skills = (await Promise.all([...dirs].map((d) => load(d, e.name, tags)))).filter((x) => !!x);
     plugins.push({ name: e.name, description: e.description ?? manifest?.description, dir, skills, hasPluginJson: !!manifest, root: dir === ".", entry: e });
@@ -214,7 +245,10 @@ export async function discover(src: SourceInfo, opts: DiscoverOptions = {}): Pro
     if (!d.isDirectory() || d.name.startsWith(".")) continue;
     const dir = `plugins/${d.name}`;
     if (covered.has(dir)) continue;
-    const dirs = (await skillDirs(root, `${dir}/skills`)).filter((x) => !claimed.has(x));
+    const all = await skillDirs(root, `${dir}/skills`, warnings);
+    const dirs = all.filter((x) => !claimed.has(x));
+    if (!all.length && !(await exists(path.join(root, dir, "skills"))))
+      warnings.push(`${dir}: not listed, it has no skills/ folder (skills go in ${dir}/skills/<name>/SKILL.md)`);
     if (!dirs.length) continue;
     const manifest = await readJson<Manifest>(path.join(root, dir, ".claude-plugin", "plugin.json"));
     const pname = freeName(slugify(manifest?.name ?? d.name));
@@ -223,7 +257,9 @@ export async function discover(src: SourceInfo, opts: DiscoverOptions = {}): Pro
   }
 
   // 3. Convention: root skills/* not covered by an incoming entry, as one plugin.
-  const rootSkills = await skillDirs(root, "skills");
+  const rootSkills = await skillDirs(root, "skills", warnings);
+  if (await exists(path.join(root, "SKILL.md")))
+    warnings.push("SKILL.md at the repo root isn't read; skills live in skills/<name>/SKILL.md (or plugins/<plugin>/skills/<name>/SKILL.md)");
   const orphans = covered.has(".") ? [] : rootSkills.filter((x) => !claimed.has(x));
   if (orphans.length) {
     const rootManifest = rootPluginJson ? await readJson<Manifest>(path.join(root, ".claude-plugin", "plugin.json")) : undefined;
@@ -285,6 +321,6 @@ export async function discover(src: SourceInfo, opts: DiscoverOptions = {}): Pro
     rootPluginJson,
     piPackage: rootSkills.length > 0 || pkgPi,
     existing: { claude, omp },
-    warnings,
+    warnings: [...new Set(warnings)], // the same folder can be scanned for several plugins
   };
 }

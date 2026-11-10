@@ -38,7 +38,9 @@ characters. Quote descriptions that contain `: `, or the skills CLI will skip th
 4. `--write-repo` modifies `.claude-plugin/` and `.omp-plugin/` in the repo and never commits; review the diff and commit yourself.
 5. `public/` is build output. Do not commit it.
 6. Useful options: `--out <dir>`, `--name <marketplace-name>`, `--title <text>`, `--ref <branch>`, `--repo-url <git-url>`,
-   `--package-json` (make the repo a pi package), `--port <n>`.
+   `--package-json` (make the repo a pi package), `--port <n>`, `--no-index` / `--no-follow` (keep the site out of search
+   engines), `--no-repo-icon` (don't download the repo's avatar as the favicon). Private GitHub/GitLab Pages can't serve a
+   catalog to agents (no auth), so for private repos tell users to install through git.
 7. Settings can also come from `.env` (`SKILLS_PAGES_*` variables) or global preferences; `config` shows which apply.
 
 ## Publishing the skills to npm (recommended for pi)

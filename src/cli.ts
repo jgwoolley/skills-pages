@@ -15,6 +15,7 @@ import { serve } from "./serve.ts";
 import { methods, type InstallData } from "./install.ts";
 import { buildMarketplace, matchRepoMarketplace, mergeMarketplace, reservedMarketplaceName, reservedPluginName } from "./marketplace.ts";
 import { packageRoot, publish } from "./publish.ts";
+import { fetchRepoIcon, type RepoIcon } from "./repo-icon.ts";
 import { isGitUrl, parseRemote, resolveSource } from "./source.ts";
 import { writeWorkflow } from "./ci-workflow.ts";
 import { mergePackageJson, readPackageJson, skillRoots, validNpmName, type PackageJson, type PackageJsonOptions } from "./packagejson.ts";
@@ -55,6 +56,9 @@ ${pc.bold("Options")}  ${pc.dim("(each also reads SKILLS_PAGES_<NAME>, e.g. SKIL
       --repo-url <url>  Git URL instead of the origin remote (default: origin, else CI_PROJECT_URL /
                         GITHUB_SERVER_URL/GITHUB_REPOSITORY)
       --ref <ref>       Branch/tag to pin in marketplace sources (and to clone)
+      --no-index        Ask search engines not to index the site (noindex on every page, Disallow in robots.txt, no sitemap)
+      --no-follow       Ask crawlers not to follow links from the site (nofollow on every page)
+      --no-repo-icon    Don't download the repository's avatar (GitHub owner / GitLab project) to use as the favicon
   -w, --write-repo      Also write .claude-plugin/ and .omp-plugin/ marketplace.json into the repo
       --package-json    Also write/merge package.json so pi (and npm) can install the repo as a package
       --npm-name <name> Package name for --package-json (default: existing, else @<npm.scope>/<name>)
@@ -108,6 +112,9 @@ async function main() {
       title: { type: "string", short: "t" },
       "repo-url": { type: "string" },
       ref: { type: "string" },
+      index: { type: "boolean" },
+      follow: { type: "boolean" },
+      "repo-icon": { type: "boolean" },
       "write-repo": { type: "boolean", short: "w", default: false },
       "package-json": { type: "boolean" },
       "npm-name": { type: "string" },
@@ -284,6 +291,9 @@ interface Values {
   name?: string;
   title?: string;
   ref?: string;
+  index?: boolean;
+  follow?: boolean;
+  "repo-icon"?: boolean;
   "write-repo"?: boolean;
 }
 
@@ -318,6 +328,11 @@ async function build(src: SourceInfo, values: Values, interactive: boolean, ctx:
   const outR = resolveOut(values.out, env);
   values = { ...values, name: nameR?.value, title: titleR?.value, out: outR.value };
 
+  // `--no-index` / `--no-follow`, or SKILLS_PAGES_INDEX=0 / SKILLS_PAGES_FOLLOW=0.
+  const noIndex = values.index === false || (values.index === undefined && truthy(env.SKILLS_PAGES_INDEX) === false);
+  const noFollow = values.follow === false || (values.follow === undefined && truthy(env.SKILLS_PAGES_FOLLOW) === false);
+  const robotsFrom = values.index === false || values.follow === false ? "flags" : [noIndex && ctx.fromEnv("SKILLS_PAGES_INDEX"), noFollow && ctx.fromEnv("SKILLS_PAGES_FOLLOW")].filter(Boolean).join(", ");
+
   const s = spinner();
   let cat = ctx.catalog;
   if (!cat) {
@@ -325,7 +340,10 @@ async function build(src: SourceInfo, values: Values, interactive: boolean, ctx:
     cat = await discover(src, { name: values.name, title: values.title });
     s.stop(`Found ${pc.bold(String(cat.skills.length))} skill${cat.skills.length === 1 ? "" : "s"} in ${cat.plugins.length} plugin${cat.plugins.length === 1 ? "" : "s"}`);
   }
-  if (!cat.skills.length) throw new Error("No skills found (expected skills/<name>/SKILL.md or plugins/<plugin>/skills/<name>/SKILL.md)");
+  if (!cat.skills.length) throw new Error(`No skills found (expected skills/<name>/SKILL.md or plugins/<plugin>/skills/<name>/SKILL.md)${cat.warnings.length ? `. Directories that were skipped:\n${cat.warnings.map((w) => `  ${w}`).join("\n")}` : ""}`);
+  // The repo's own marketplace description wins; otherwise GitLab's project description (CI_PROJECT_DESCRIPTION).
+  const descriptionFrom = !cat.description && ciHere?.description ? "CI_PROJECT_DESCRIPTION" : undefined;
+  if (descriptionFrom) cat.description = ciHere!.description;
   const { answers } = ctx;
 
   // Name and title: ask unless given by a flag or variable.
@@ -493,6 +511,8 @@ async function build(src: SourceInfo, values: Values, interactive: boolean, ctx:
       ["name", cat.name, answers.SKILLS_PAGES_NAME ? "prompt" : nameR ? label(nameR.from) : ctx.catalog ? "default" : existingName ? "existing marketplace" : "repo name"],
       ["title", cat.title, answers.SKILLS_PAGES_TITLE ? "prompt" : titleR ? label(titleR.from) : ctx.catalog ? "default" : existingName ? "existing marketplace" : "repo name"],
       ["out", outR.value, label(outR.from)],
+      ...(descriptionFrom ? [["description", cat.description!.length > 60 ? `${cat.description!.slice(0, 59)}…` : cat.description!, descriptionFrom]] : []),
+      ...(noIndex || noFollow ? [["robots", [noIndex && "noindex", noFollow && "nofollow"].filter(Boolean).join(", "), robotsFrom]] : []),
     ]
       .map(([k, v, f]) => `${pc.bold(k!.padEnd(9))}${v}  ${from(f!)}`)
       .join("\n"),
@@ -523,8 +543,22 @@ async function build(src: SourceInfo, values: Values, interactive: boolean, ctx:
       }
     : undefined;
 
+  // The repository's avatar as favicon: downloaded now from its own host, so the site itself loads nothing from it.
+  let icon: RepoIcon | undefined;
+  const iconOn = values["repo-icon"] ?? truthy(env.SKILLS_PAGES_REPO_ICON) ?? true;
+  if (iconOn && siteRepo?.remote) {
+    const got = await fetchRepoIcon(siteRepo.remote);
+    if ("icon" in got) {
+      icon = got.icon;
+      p.log.info(`Favicon: the repository icon ${pc.dim(`(${got.icon.from}, ${got.icon.bytes.length} bytes)`)}`);
+    } else p.log.info(pc.dim(`Favicon: using the generated icon. Repository icon not used: ${got.skipped}`));
+  }
+
   s.start(`Writing ${pc.cyan(values.out ?? "public")}`);
   const res = await publish(cat, src, {
+    ...(icon ? { icon } : {}),
+    ...(noIndex ? { noIndex } : {}),
+    ...(noFollow ? { noFollow } : {}),
     out: values.out ?? "public",
     siteUrl,
     siteUrlKnown: baseR.from !== "fallback",

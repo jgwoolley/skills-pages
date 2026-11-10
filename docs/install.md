@@ -143,5 +143,7 @@ across upgrades.
 
 - skills-pages makes no telemetry or analytics calls.
 - Building from a git URL clones it.
+- Building a repo on github.com or a GitLab server downloads its icon (anonymously, from that host only) to use as the favicon;
+  `--no-repo-icon` or `SKILLS_PAGES_REPO_ICON=0` turns it off.
 - The generated install guides call `npx skills` with `DISABLE_TELEMETRY=1`.
 - Generated CI jobs set `DO_NOT_TRACK=1`.

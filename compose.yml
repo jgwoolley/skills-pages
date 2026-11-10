@@ -28,7 +28,6 @@ services:
       - traefik.http.routers.skills-pages-web.rule=Host(`${SKILLS_PAGES_HOST:-skills-pages.localhost}`)
       - traefik.http.routers.skills-pages-web.entrypoints=web
       - traefik.http.services.skills-pages-web.loadbalancer.server.port=80
-    restart: unless-stopped
 
 networks:
   proxy:

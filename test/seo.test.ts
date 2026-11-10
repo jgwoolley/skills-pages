@@ -46,6 +46,23 @@ describe("seo", () => {
     assert.match(sitemapXml("https://acme.github.io/skills/", ["", "skill/alpha/"], "2026-11-06T10:00:00Z"), /<loc>https:\/\/acme\.github\.io\/skills\/skill\/alpha\/<\/loc><lastmod>2026-11-06<\/lastmod>/);
   });
 
+  it("--no-index and --no-follow reach the robots meta and robots.txt", () => {
+    const head = (indexable: boolean, follow?: boolean) => headTags({ title: "t", description: "d", siteTitle: "S", page: { kind: "catalog", root: "" }, data: data(), indexable, follow, image });
+    assert.match(head(true), /content="index, follow, max-image-preview:large"/);
+    assert.match(head(true, false), /content="index, nofollow, max-image-preview:large"/);
+    assert.match(head(false, false), /content="noindex, nofollow"/);
+    assert.match(head(false), /content="noindex, follow"/);
+    assert.match(robotsTxt("https://acme.github.io/skills/", false, "Built with --no-index"), /^# Built with --no-index: .*\nUser-agent: \*\nDisallow: \/\n$/);
+  });
+
+  it("uses the repository icon for the favicon links when there is one", () => {
+    const icon = { path: "assets/icons/repo.png", mime: "image/png", width: 256, height: 256 };
+    const head = headTags({ title: "t", description: "d", siteTitle: "S", page: { kind: "skill", skill: "alpha", root: "../../" }, data: data({ icon }), indexable: true, image });
+    assert.match(head, /<link rel="icon" href="\.\.\/\.\.\/assets\/icons\/repo\.png" type="image\/png" sizes="256x256">/);
+    assert.match(head, /<link rel="apple-touch-icon" href="\.\.\/\.\.\/assets\/icons\/repo\.png">/);
+    assert.doesNotMatch(head, /icon\.svg/);
+  });
+
   it("escapes JSON-LD so it can't close its script tag", () => {
     const head = headTags({ title: "t", description: "</script><b>", siteTitle: "S", page: { kind: "catalog", root: "" }, data: data(), indexable: true, image });
     assert.equal(head.match(/<\/script>/g)!.length, 1);
@@ -60,6 +77,12 @@ describe("pwa", () => {
     assert.ok(m.icons.some((i: { purpose: string }) => i.purpose === "maskable"));
     assert.equal(shortName("A very long catalog title"), "Skills");
     assert.equal(shortName("Acme agent skills"), "Acme");
+  });
+
+  it("lists the repository icon in the manifest only when it is a PNG with a size", () => {
+    const icons = (icon?: { path: string; mime: string; width?: number; height?: number }) => JSON.parse(manifest({ title: "t", description: "d", icon })).icons as { src: string; sizes: string }[];
+    assert.deepEqual(icons({ path: "assets/icons/repo.png", mime: "image/png", width: 460, height: 460 })[0], { src: "assets/icons/repo.png", sizes: "460x460", type: "image/png", purpose: "any" });
+    assert.equal(icons({ path: "assets/icons/repo.jpg", mime: "image/jpeg" }).length, icons().length);
   });
 
   it("service worker scopes its caches to the site and skips archives", () => {

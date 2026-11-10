@@ -22,6 +22,8 @@ export interface CiInfo {
   pagesUrl?: string;
   pagesFrom?: string;
   title?: string;
+  /** The project's description (GitLab `CI_PROJECT_DESCRIPTION`), the catalog description when the repo has none. */
+  description?: string;
   /** The CI run that is building this site (shown on the build page). */
   run?: { url: string; label: string; pipelineUrl?: string; ref?: string };
 }
@@ -39,6 +41,7 @@ export function ciInfo(env: Env): CiInfo | undefined {
       sha: nonEmpty(env.CI_COMMIT_SHA),
       ...(pages ? { pagesUrl: slash(pages), pagesFrom: "CI_PAGES_URL" } : {}),
       title: nonEmpty(env.CI_PROJECT_TITLE),
+      ...(nonEmpty(env.CI_PROJECT_DESCRIPTION) ? { description: nonEmpty(env.CI_PROJECT_DESCRIPTION) } : {}),
       ...(nonEmpty(env.CI_JOB_URL) || nonEmpty(env.CI_PIPELINE_URL)
         ? {
             run: {

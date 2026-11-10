@@ -69,6 +69,11 @@ Frontmatter `name` / `description` come from each `SKILL.md`. Tags come from fro
 or `metadata.keywords` (list or comma-separated), plus the plugin's `plugin.json` `keywords`. An existing `.claude-plugin/marketplace.json` supplies the
 marketplace name, the owner and plugin descriptions.
 
+**Folders that aren't read** are reported, not skipped silently: each one gets a warning (build output, and `check`) with the
+cause and the fix. For example a `skill.md` that must be `SKILL.md`, a skill nested one level too deep, a folder with no
+`SKILL.md`, a hidden (`.`-prefixed) folder, a symlink, a `plugins/<plugin>/` without a `skills/` folder, a `SKILL.md` at the
+repo root, or a marketplace entry whose `skills` path doesn't exist. If nothing is found at all, the error lists them.
+
 ## What it writes (`./public`, or `--out`)
 
 | Path | For |
@@ -238,6 +243,7 @@ terminal.
 
 ```
 skills-pages build [source] [-o public] [-b base-url] [-n name] [-t title] [--repo-url url] [--ref ref] [-w] [-y]
+                    [--no-index] [--no-follow] [--no-repo-icon]
 skills-pages serve --installed [--port 4173]        # build and preview your installed skills
 skills-pages build --no-interactive ...      # no prompts (CI is never interactive)
 skills-pages build --prompt ...              # ask everything; Enter keeps the current value
@@ -255,11 +261,38 @@ picked and where it came from:
 | name | `--name` → `SKILLS_PAGES_NAME` | existing marketplace name, else repo name |
 | title | `--title` → `SKILLS_PAGES_TITLE` | GitLab `CI_PROJECT_TITLE`, else the name |
 | out | `--out` → `SKILLS_PAGES_OUT` | `public` |
+| description | the repo marketplace's description | GitLab `CI_PROJECT_DESCRIPTION` (the project description), else the built-in text |
+| index / follow | `--no-index` / `--no-follow` → `SKILLS_PAGES_INDEX=0` / `SKILLS_PAGES_FOLLOW=0` | both on (a preview or placeholder URL is always noindex) |
+| repo icon | `--no-repo-icon` → `SKILLS_PAGES_REPO_ICON=0` | on |
 
 - CI variables are only used when the source is the job's own checkout.
 - GitHub Pages URLs are only derived on github.com. On GitHub Enterprise Server, or with a custom domain, pass
   `--base-url ${{ steps.pages.outputs.base_url }}` from `actions/configure-pages`.
 - Without a TTY (CI) or with `--yes` there are no prompts.
+
+### Search engines: `--no-index`, `--no-follow`
+
+By default a site on a real public URL is indexable and followable. To keep it out of search results, build with
+`--no-index` (or `SKILLS_PAGES_INDEX=0`): every page gets `noindex`, `robots.txt` says `Disallow: /`, and there's no
+`sitemap.xml`. `--no-follow` (or `SKILLS_PAGES_FOLLOW=0`) adds `nofollow` to every page. They combine, and the Settings box
+shows what's on. These are requests that well-behaved crawlers honour; they don't make a site private. `robots.txt` is
+only read at an origin's root, so under a project path (`user.github.io/repo/`) the per-page meta tags do the work.
+
+### Favicon: the repository's icon
+
+When the repo is on github.com or a GitLab server, the build downloads its icon once and serves it from the site as the
+favicon, apple-touch-icon, navbar logo and web-app icon (the social card stays the default). GitHub repos have no icon of
+their own, so it's the **owner's avatar**; on GitLab it's the **project avatar**, else the **group's**. It's an anonymous
+request to the repo's own host (never a token, never Gravatar or another host), limited to PNG/JPEG/GIF/WebP under 1 MB.
+Private repositories and anything that fails fall back to the generated icon, and the build log says why. `--no-repo-icon`
+(or `SKILLS_PAGES_REPO_ICON=0`) turns it off.
+
+### Private Pages
+
+**Private GitHub Pages and GitLab Pages can't serve a catalog.** Claude Code, oh-my-pi, OpenCode and the skills CLI
+download the marketplace, index and zips without signing in, and a catalog has no way to give them credentials. For a
+private repository, prefer the **git** methods (Git marketplace, pi package, skills CLI from the repo): they use your own
+git credentials. The site-based install steps say so. The site is still fine to browse by people who can sign in.
 
 ### CI
 
@@ -279,6 +312,8 @@ Source page. Before deploying, `skills-pages check public --strict` fails the jo
 - The site loads nothing from other hosts: system fonts, no analytics.
 - A strict CSP (`default-src 'none'`, no inline script) and `no-referrer` are set.
 - Settings are stored in `localStorage`.
+- The build downloads the repository's icon from github.com / its GitLab server (see [Favicon](#favicon-the-repositorys-icon));
+  `--no-repo-icon` makes the build fully offline. The icon is then served from the site itself.
 - The build footer ("Built … ago", linking to the catalog commit) is filled in at generation time.
 
 ## Development

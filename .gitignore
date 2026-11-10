@@ -4,3 +4,4 @@ public/
 .env
 secrets/
 *.log
+commit.sh

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
@@ -256,7 +256,9 @@ describe("install methods", () => {
       install: ["claude plugin install skills@mkt --scope project"],
       update: ["claude plugin marketplace update mkt\nclaude plugin update skills@mkt"],
     });
-    assert.deepEqual(m.phases[0]!.notes, ["Source: [claude/marketplace.json](claude/marketplace.json) on this site; plugins are zip archives of the skills, also from this site (the HTTPS/SSH choice doesn't apply)."]);
+    assert.equal(m.phases[0]!.notes!.length, 2);
+    assert.equal(m.phases[0]!.notes![0], "Source: [claude/marketplace.json](claude/marketplace.json) on this site; plugins are zip archives of the skills, also from this site (the HTTPS/SSH choice doesn't apply).");
+    assert.match(m.phases[0]!.notes![1]!, /^Needs a public site/);
     // Not on public HTTPS (e.g. an http://localhost preview): still offered, with a note.
     const preview = method(data({ siteArchives: false }), "claude", "site-marketplace", { protocol: "https", scope: "global" });
     assert.ok(preview.phases[0]!.notes!.some((n) => n.includes("once it's deployed over HTTPS")));
@@ -276,6 +278,15 @@ describe("install methods", () => {
     const cli = method(d, "cursor", "skills-cli", { protocol: "ssh", scope: "global", skill: "alpha" });
     assert.deepEqual(phases(cli).install, ["DISABLE_TELEMETRY=1 npx skills add https://acme.github.io/skills/ --skill alpha --agent cursor -g -y"]);
     assert.match(cli.phases[0]!.notes![0]!, /^Source: \[\.well-known\/agent-skills\/index\.json\]/);
+  });
+  it("site-based methods say private Pages can't be used; git methods don't", () => {
+    const g = { protocol: "https", scope: "global" } as const;
+    const d = data({ deploy: { builtBy: "ci" } });
+    const notes = (m: Method) => m.phases.flatMap((p) => p.notes ?? []).join("\n");
+    for (const [agent, id] of [["claude", "site-marketplace"], ["opencode", "remote-index"]] as const)
+      assert.match(notes(method(d, agent, id, g)), /Needs a public site: agents can't sign in to private GitHub \/ GitLab Pages, so for a private repository use a git method/, id);
+    assert.doesNotMatch(notes(method(d, "pi", "skills-cli", g)), /Needs a public site/, "a skills CLI install from the repo uses git credentials");
+    assert.doesNotMatch(notes(method(data({ siteUrl: "http://localhost:4173/" }), "claude", "site-marketplace", g)), /Needs a public site/, "local previews");
   });
   it("a local build of a public URL still shows the commands, with a heads-up about deploying", () => {
     const g = { protocol: "https", scope: "global" } as const;
@@ -576,6 +587,113 @@ describe("publish", () => {
       assert.doesNotMatch(footer, /\/commit\/|href="#"/, "never a commit link it can't back up");
     } finally {
       await rm(out, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("publish: robots and icon", () => {
+  const git = { claude: false, omp: false, claudeSkills: [], ompSkills: [], claudeEntries: [], ompEntries: [] };
+  const png = new Uint8Array(33);
+  png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  new DataView(png.buffer).setUint32(16, 128);
+  new DataView(png.buffer).setUint32(20, 128);
+
+  it("--no-index / --no-follow: meta tags, Disallow, no sitemap", async () => {
+    const out = await mkdtemp(path.join(tmpdir(), "skills-pages-test-"));
+    try {
+      const src = fixture("root-layout");
+      await publish(await discover(src), src, { out, siteUrl: "https://acme.github.io/skills/", git, noIndex: true, noFollow: true });
+      assert.match(await readFile(path.join(out, "index.html"), "utf8"), /<meta name="robots" content="noindex, nofollow">/);
+      assert.match(await readFile(path.join(out, "robots.txt"), "utf8"), /--no-index[^\n]*\nUser-agent: \*\nDisallow: \//);
+      assert.equal(existsSync(path.join(out, "sitemap.xml")), false);
+    } finally {
+      await rm(out, { recursive: true, force: true });
+    }
+  });
+
+  it("nofollow alone keeps the site indexable", async () => {
+    const out = await mkdtemp(path.join(tmpdir(), "skills-pages-test-"));
+    try {
+      const src = fixture("root-layout");
+      await publish(await discover(src), src, { out, siteUrl: "https://acme.github.io/skills/", git, noFollow: true });
+      assert.match(await readFile(path.join(out, "index.html"), "utf8"), /content="index, nofollow, max-image-preview:large"/);
+      assert.equal(existsSync(path.join(out, "sitemap.xml")), true);
+    } finally {
+      await rm(out, { recursive: true, force: true });
+    }
+  });
+
+  it("the repository icon becomes favicon, favicon.ico, manifest icon and navbar logo", async () => {
+    const out = await mkdtemp(path.join(tmpdir(), "skills-pages-test-"));
+    try {
+      const src = fixture("root-layout");
+      await publish(await discover(src), src, { out, siteUrl: "https://acme.github.io/skills/", git, icon: { bytes: png, ext: "png", mime: "image/png", width: 128, height: 128, from: "https://github.com/acme.png" } });
+      const html = await readFile(path.join(out, "skill", "alpha", "index.html"), "utf8");
+      assert.match(html, /<link rel="icon" href="\.\.\/\.\.\/assets\/icons\/repo\.png" type="image\/png" sizes="128x128">/);
+      assert.match(html, /<img class="brand-icon" src="\.\.\/\.\.\/assets\/icons\/repo\.png"/);
+      assert.deepEqual([...(await readFile(path.join(out, "assets", "icons", "repo.png")))], [...png]);
+      assert.deepEqual([...(await readFile(path.join(out, "favicon.ico"))).subarray(6, 8)], [128, 128]);
+      assert.equal(JSON.parse(await readFile(path.join(out, "manifest.webmanifest"), "utf8")).icons[0].src, "assets/icons/repo.png");
+      assert.match(await readFile(path.join(out, "sw.js"), "utf8"), /assets\/icons\/repo\.png/);
+    } finally {
+      await rm(out, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("discover: why folders are skipped", () => {
+  const SKILL = "---\nname: ok\ndescription: fine\n---\n";
+  async function repo(files: Record<string, string>): Promise<{ src: SourceInfo; done: () => Promise<void> }> {
+    const dir = await mkdtemp(path.join(tmpdir(), "skills-pages-test-"));
+    for (const [f, text] of Object.entries(files)) {
+      await mkdir(path.dirname(path.join(dir, f)), { recursive: true });
+      await writeFile(path.join(dir, f), text);
+    }
+    return { src: { dir, local: true, cleanup: async () => {} }, done: () => rm(dir, { recursive: true, force: true }) };
+  }
+
+  it("names the cause and the fix for each skipped folder", async () => {
+    const r = await repo({
+      "skills/ok/SKILL.md": SKILL,
+      "skills/lowercase/skill.md": SKILL,
+      "skills/group/inner/SKILL.md": SKILL.replace("ok", "inner"),
+      "skills/empty/notes.txt": "x",
+      "skills/.hidden/SKILL.md": SKILL.replace("ok", "hidden"),
+      "skills/node_modules/x/SKILL.md": SKILL,
+      "plugins/bare/.claude-plugin/plugin.json": "{}",
+      "SKILL.md": SKILL,
+    });
+    try {
+      await symlink(path.join(r.src.dir, "skills", "ok"), path.join(r.src.dir, "skills", "linked"));
+      const cat = await discover(r.src);
+      assert.deepEqual(cat.skills.map((s) => s.name), ["ok"]);
+      const w = cat.warnings.join("\n");
+      assert.match(w, /skills\/lowercase: skipped, the file is named skill\.md; rename it to SKILL\.md/);
+      assert.match(w, /skills\/group: skipped, it has no SKILL\.md, but skills\/group\/inner\/SKILL\.md exists; skills must sit directly in skills\//);
+      assert.match(w, /skills\/empty: skipped, it has no SKILL\.md, so it isn't a skill/);
+      assert.match(w, /skills\/\.hidden: skipped, folders starting with "\." are hidden/);
+      assert.match(w, /skills\/linked: skipped, symlinks aren't followed/);
+      assert.match(w, /plugins\/bare: not listed, it has no skills\/ folder/);
+      assert.match(w, /SKILL\.md at the repo root isn't read/);
+      assert.doesNotMatch(w, /node_modules/);
+      assert.equal(new Set(cat.warnings).size, cat.warnings.length, "no duplicates");
+    } finally {
+      await r.done();
+    }
+  });
+
+  it("reports marketplace skills paths that hold nothing", async () => {
+    const r = await repo({
+      ".claude-plugin/marketplace.json": JSON.stringify({ name: "m", owner: { name: "o" }, plugins: [{ name: "p", source: "./", skills: ["./nowhere", "./docs"] }] }),
+      "docs/readme.md": "x",
+      "skills/ok/SKILL.md": SKILL,
+    });
+    try {
+      const w = (await discover(r.src)).warnings.join("\n");
+      assert.match(w, /Marketplace entry "p": skills path \.\/nowhere doesn't exist/);
+      assert.match(w, /Marketplace entry "p": skills path \.\/docs has no SKILL\.md and no folders with one/);
+    } finally {
+      await r.done();
     }
   });
 });
